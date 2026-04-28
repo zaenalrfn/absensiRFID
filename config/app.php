@@ -107,6 +107,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | RFID API Key
+    |--------------------------------------------------------------------------
+    |
+    | This key is used to authenticate requests from ESP32 RFID devices.
+    | It must match the API_KEY configured in the ESP32 firmware.
+    |
+    */
+
+    'rfid_api_key' => env('RFID_API_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Maintenance Mode Driver
     |--------------------------------------------------------------------------
     |
