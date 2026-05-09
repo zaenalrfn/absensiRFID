@@ -20,7 +20,6 @@ class UserUpdateRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($this->route('user'))],
             'password' => ['nullable', Password::defaults()],
-            'rfid_uid' => ['nullable', 'string', 'max:50', Rule::unique('users')->ignore($this->route('user'))],
             'role' => ['required', 'string', 'in:admin,user'],
         ];
     }

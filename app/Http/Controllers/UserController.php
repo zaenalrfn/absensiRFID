@@ -15,7 +15,8 @@ class UserController extends Controller
     {
         return Inertia::render('Users/Index', [
             'users' => User::query()
-                ->select('id', 'name', 'email', 'rfid_uid', 'role', 'created_at')
+                ->with('rfidCard')
+                ->select('id', 'name', 'email', 'role', 'created_at')
                 ->latest('id')
                 ->paginate(15),
         ]);
@@ -36,8 +37,16 @@ class UserController extends Controller
 
     public function edit(User $user): Response
     {
+        $user->load('rfidCard');
+
         return Inertia::render('Users/Form', [
-            'user' => $user->only('id', 'name', 'email', 'rfid_uid', 'role'),
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'rfid_uid' => $user->rfidCard?->uid,
+            ],
         ]);
     }
 

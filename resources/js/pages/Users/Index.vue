@@ -55,7 +55,7 @@ function deleteUser(user: User) {
                         <tr>
                             <th class="px-6 py-3">Nama</th>
                             <th class="px-6 py-3">Email</th>
-                            <th class="px-6 py-3">RFID UID</th>
+                            <th class="px-6 py-3">Kartu Terhubung</th>
                             <th class="px-6 py-3">Role</th>
                             <th class="px-6 py-3 text-right">Aksi</th>
                         </tr>
@@ -74,10 +74,10 @@ function deleteUser(user: User) {
                             </td>
                             <td class="px-6 py-4">
                                 <code
-                                    v-if="user.rfid_uid"
-                                    class="rounded bg-neutral-100 px-1.5 py-0.5 text-xs dark:bg-neutral-800"
+                                    v-if="user.rfid_card"
+                                    class="rounded bg-neutral-100 px-1.5 py-0.5 text-xs font-bold dark:bg-neutral-800"
                                 >
-                                    {{ user.rfid_uid }}
+                                    {{ user.rfid_card.uid }}
                                 </code>
                                 <span
                                     v-else

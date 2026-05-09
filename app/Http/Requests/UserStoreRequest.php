@@ -19,7 +19,6 @@ class UserStoreRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', Password::defaults()],
-            'rfid_uid' => ['nullable', 'string', 'max:50', 'unique:users'],
             'role' => ['required', 'string', 'in:admin,user'],
         ];
     }

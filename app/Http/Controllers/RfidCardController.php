@@ -24,12 +24,14 @@ class RfidCardController extends Controller
             'label' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $rfidCard->update($validated);
-
-        // Optional: update user's rfid_uid for legacy compatibility
-        if ($rfidCard->user_id) {
-            $rfidCard->user->update(['rfid_uid' => $rfidCard->uid]);
+        // If assigning a user, ensure they don't have another card assigned
+        if ($request->filled('user_id')) {
+            RfidCard::where('user_id', $validated['user_id'])
+                ->where('id', '!=', $rfidCard->id)
+                ->update(['user_id' => null]);
         }
+
+        $rfidCard->update($validated);
 
         return back()->with('success', 'Kartu berhasil diperbarui');
     }

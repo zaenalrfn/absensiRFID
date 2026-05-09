@@ -3,7 +3,9 @@ export type User = {
     name: string;
     email: string;
     avatar?: string;
-    rfid_uid?: string | null;
+    rfid_card?: {
+        uid: string;
+    } | null;
     role?: 'admin' | 'user';
     email_verified_at: string | null;
     created_at: string;
