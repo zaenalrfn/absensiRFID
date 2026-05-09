@@ -3,6 +3,7 @@
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\RfidCardController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +19,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('schedules', ScheduleController::class)->except('show');
     Route::get('attendances', [AttendanceController::class, 'index'])->name('attendances.index');
     Route::get('devices', [DeviceController::class, 'index'])->name('devices.index');
+    Route::resource('rfid-cards', RfidCardController::class)->only(['index', 'update', 'destroy']);
 });
 
 require __DIR__.'/settings.php';

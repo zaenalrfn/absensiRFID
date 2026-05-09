@@ -6,8 +6,8 @@ use App\Events\AttendanceCreated;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Device;
+use App\Models\RfidCard;
 use App\Models\Schedule;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,52 +23,93 @@ class AttendanceController extends Controller
             'device_id' => ['required', 'string', 'max:100'],
         ]);
 
-        // Find user by RFID UID
-        $user = User::where('rfid_uid', $validated['uid'])->first();
+        $now = now();
 
-        if (! $user) {
+        // 1. Find or Register RFID Card
+        $card = RfidCard::firstOrCreate(
+            ['uid' => $validated['uid']],
+            ['label' => 'Kartu Baru']
+        );
+
+        $card->update(['last_seen_at' => $now]);
+
+        // 2. Check Assignment
+        if (! $card->user_id) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'UID tidak terdaftar',
-            ], 404);
+                'status' => 'registered',
+                'message' => 'Kartu baru terdaftar/belum di-assign ke user',
+            ], 200); // Arduino treats 200 as success, but shows message
         }
 
-        // Determine check-in or check-out status
+        $user = $card->user;
+
+        // 3. Find Active Schedule
+        $schedule = Schedule::whereTime('start_time', '<=', $now->format('H:i:s'))
+            ->whereTime('end_time', '>=', $now->format('H:i:s'))
+            ->first();
+
+        // If no active schedule, try to find the "current" one based on closest end_time
+        if (! $schedule) {
+            $schedule = Schedule::orderByRaw('ABS(TIMESTAMPDIFF(SECOND, end_time, ?))', [$now->format('H:i:s')])->first();
+        }
+
+        if (! $schedule) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Tidak ada jadwal aktif',
+            ], 400);
+        }
+
+        // 4. Attendance Logic
         $lastAttendance = Attendance::where('user_id', $user->id)
             ->whereDate('timestamp', today())
             ->latest('timestamp')
             ->first();
 
         $status = 'masuk';
-        if ($lastAttendance) {
-            $status = $lastAttendance->status === 'masuk' ? 'pulang' : 'masuk';
+        $currentTime = $now->format('H:i:s');
+        $endTime = $schedule->end_time->format('H:i:s');
+
+        if (! $lastAttendance) {
+            // First tap of the day
+            $status = ($currentTime < $endTime) ? 'masuk' : 'pulang';
+        } elseif ($lastAttendance->status === 'masuk') {
+            // Already checked in, check if it's time to check out
+            if ($currentTime >= $endTime) {
+                $status = 'pulang';
+            } else {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Sudah absen masuk. Belum jam pulang.',
+                ], 400);
+            }
+        } else {
+            // Already checked out
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Sudah absen pulang hari ini',
+            ], 400);
         }
 
-        // Detect active schedule
-        $now = now();
-        $schedule = Schedule::whereTime('start_time', '<=', $now->format('H:i:s'))
-            ->whereTime('end_time', '>=', $now->format('H:i:s'))
-            ->first();
-
-        // Save attendance
+        // 5. Save Attendance
         $attendance = Attendance::create([
             'user_id' => $user->id,
             'uid' => $validated['uid'],
             'status' => $status,
-            'schedule_id' => $schedule?->id,
+            'schedule_id' => $schedule->id,
             'device_id' => $validated['device_id'],
             'timestamp' => $now,
             'created_at' => $now,
         ]);
 
-        // Update device last_seen
+        // 6. Update Device Status
         Device::where('device_code', $validated['device_id'])
             ->update([
                 'last_seen_at' => $now,
                 'last_ip' => $request->ip(),
             ]);
 
-        // Broadcast event
+        // 7. Broadcast Event
         broadcast(new AttendanceCreated($attendance))->toOthers();
 
         return response()->json([
@@ -77,7 +118,7 @@ class AttendanceController extends Controller
             'data' => [
                 'name' => $user->name,
                 'status' => $status,
-                'schedule' => $schedule?->name ?? 'Di luar jadwal',
+                'schedule' => $schedule->name,
                 'timestamp' => $now->format('Y-m-d H:i:s'),
             ],
         ]);

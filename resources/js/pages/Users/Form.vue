@@ -131,24 +131,26 @@ function submit() {
             <!-- RFID UID -->
             <div>
                 <label
-                    for="rfid_uid"
                     class="mb-2 block text-sm font-medium"
                 >
                     RFID UID
-                    <span class="text-neutral-400">(opsional)</span>
                 </label>
-                <input
-                    id="rfid_uid"
-                    v-model="form.rfid_uid"
-                    type="text"
-                    placeholder="contoh: A1B2C3D4"
-                    class="w-full rounded-lg border border-neutral-300 bg-white px-4 py-2.5 font-mono text-sm uppercase transition-colors focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:focus:border-neutral-400 dark:focus:ring-neutral-400"
-                />
-                <p
-                    v-if="form.errors.rfid_uid"
-                    class="mt-1 text-sm text-red-600"
-                >
-                    {{ form.errors.rfid_uid }}
+                <div class="flex items-center gap-4 rounded-lg border border-neutral-300 bg-neutral-50 px-4 py-2.5 dark:border-neutral-700 dark:bg-neutral-800/50">
+                    <code v-if="form.rfid_uid" class="font-mono text-sm font-bold uppercase">
+                        {{ form.rfid_uid }}
+                    </code>
+                    <span v-else class="text-sm text-neutral-400">
+                        Belum ada kartu terhubung
+                    </span>
+                    <Link 
+                        href="/rfid-cards" 
+                        class="ml-auto text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                        Kelola Kartu →
+                    </Link>
+                </div>
+                <p class="mt-2 text-xs text-neutral-500">
+                    Penugasan kartu dilakukan melalui menu <strong>Kartu RFID</strong>.
                 </p>
             </div>
 

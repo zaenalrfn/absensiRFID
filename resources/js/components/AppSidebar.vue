@@ -4,6 +4,7 @@ import {
     BookOpen,
     CalendarClock,
     ClipboardList,
+    CreditCard,
     FolderGit2,
     LayoutGrid,
     MonitorSmartphone,
@@ -50,6 +51,11 @@ const mainNavItems: NavItem[] = [
         title: 'Devices',
         href: '/devices',
         icon: MonitorSmartphone,
+    },
+    {
+        title: 'Kartu RFID',
+        href: '/rfid-cards',
+        icon: CreditCard,
     },
 ];
 
