@@ -444,7 +444,12 @@ if (httpCode == 200) {
         Serial.println(F("  ║ Silakan hubungi admin web.   ║"));
         Serial.println(F("  ╚══════════════════════════════╝"));
 
-        unknownCardIndicator(); // LED merah + beep 3x
+        // Gunakan indikator "Registered" (Hijau + 2 bip)
+        Serial.println(F("[LED] Hijau — Kartu baru berhasil terdaftar"));
+        digitalWrite(PIN_LED_GREEN, HIGH);
+        buzzTone(100, 2, 100); // 2 bip pendek (tanda terdaftar)
+        delay(800);
+        digitalWrite(PIN_LED_GREEN, LOW);
     }
 
     http.end();

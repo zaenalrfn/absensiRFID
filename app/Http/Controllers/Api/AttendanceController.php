@@ -43,24 +43,7 @@ class AttendanceController extends Controller
 
         $user = $card->user;
 
-        // 3. Find Active Schedule
-        $schedule = Schedule::whereTime('start_time', '<=', $now->format('H:i:s'))
-            ->whereTime('end_time', '>=', $now->format('H:i:s'))
-            ->first();
-
-        // If no active schedule, try to find the "current" one based on closest end_time
-        if (! $schedule) {
-            $schedule = Schedule::orderByRaw('ABS(TIMESTAMPDIFF(SECOND, end_time, ?))', [$now->format('H:i:s')])->first();
-        }
-
-        if (! $schedule) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Tidak ada jadwal aktif',
-            ], 400);
-        }
-
-        // 4. Attendance Logic
+        // 3. Find Last Attendance to Determine Status or Checkout Schedule
         $lastAttendance = Attendance::where('user_id', $user->id)
             ->whereDate('timestamp', today())
             ->latest('timestamp')
@@ -68,27 +51,70 @@ class AttendanceController extends Controller
 
         $status = 'masuk';
         $currentTime = $now->format('H:i:s');
-        $endTime = $schedule->end_time->format('H:i:s');
 
-        if (! $lastAttendance) {
-            // First tap of the day
-            $status = ($currentTime < $endTime) ? 'masuk' : 'pulang';
-        } elseif ($lastAttendance->status === 'masuk') {
-            // Already checked in, check if it's time to check out
-            if ($currentTime >= $endTime) {
-                $status = 'pulang';
-            } else {
+        if ($lastAttendance && $lastAttendance->status === 'masuk') {
+            // Already checked in, user wants to check out!
+            // Retrieve the schedule they checked in to
+            $schedule = $lastAttendance->schedule;
+            $status = 'pulang';
+
+            if (! $schedule) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Jadwal tidak ditemukan',
+                ], 400);
+            }
+
+            // Validate if it is time to check out
+            $endTime = $schedule->end_time->format('H:i:s');
+            if ($currentTime < $endTime) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Sudah absen masuk. Belum jam pulang.',
                 ], 400);
             }
         } else {
-            // Already checked out
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Sudah absen pulang hari ini',
-            ], 400);
+            // No attendance today, or already checked out from a previous shift.
+            // User wants to check in (absen masuk) for a new shift.
+
+            // Find Active Schedule for checking in
+            $schedule = Schedule::whereTime('start_time', '<=', $currentTime)
+                ->whereTime('end_time', '>=', $currentTime)
+                ->first();
+
+            // If no active schedule, try to find the "closest" one based on closest start_time or end_time
+            if (! $schedule) {
+                $schedule = Schedule::orderByRaw(
+                    'LEAST(ABS(TIME_TO_SEC(TIMEDIFF(start_time, ?))), ABS(TIME_TO_SEC(TIMEDIFF(end_time, ?))))',
+                    [$currentTime, $currentTime]
+                )->first();
+            }
+
+            if (! $schedule) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Tidak ada jadwal aktif',
+                ], 400);
+            }
+
+            $endTime = $schedule->end_time->format('H:i:s');
+            $status = ($currentTime < $endTime) ? 'masuk' : 'pulang';
+
+            // If they already completed this schedule today, prevent duplicate check-out
+            if ($lastAttendance && $lastAttendance->status === 'pulang') {
+                $hasCompletedThisSchedule = Attendance::where('user_id', $user->id)
+                    ->whereDate('timestamp', today())
+                    ->where('schedule_id', $schedule->id)
+                    ->where('status', 'pulang')
+                    ->exists();
+
+                if ($hasCompletedThisSchedule) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Sudah absen pulang hari ini',
+                    ], 400);
+                }
+            }
         }
 
         // 5. Save Attendance

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Attendance;
 use App\Models\Device;
+use App\Models\RfidCard;
 use App\Models\Schedule;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -19,7 +20,6 @@ class DatabaseSeeder extends Seeder
         User::factory()->admin()->create([
             'name' => 'Admin',
             'email' => 'admin@example.com',
-            'rfid_uid' => null,
         ]);
 
         // Regular users with RFID cards
@@ -27,18 +27,32 @@ class DatabaseSeeder extends Seeder
         $users->push(User::factory()->create([
             'name' => 'Budi Santoso',
             'email' => 'budi@example.com',
-            'rfid_uid' => 'A1B2C3D4',
         ]));
         $users->push(User::factory()->create([
             'name' => 'Sari Dewi',
             'email' => 'sari@example.com',
-            'rfid_uid' => 'E5F6A7B8',
         ]));
         $users->push(User::factory()->create([
             'name' => 'Andi Pratama',
             'email' => 'andi@example.com',
-            'rfid_uid' => '11223344',
         ]));
+
+        // Create Rfid Cards
+        RfidCard::create([
+            'uid' => 'A1B2C3D4',
+            'user_id' => $users[0]->id,
+            'label' => 'Kartu Budi Santoso',
+        ]);
+        RfidCard::create([
+            'uid' => 'E5F6A7B8',
+            'user_id' => $users[1]->id,
+            'label' => 'Kartu Sari Dewi',
+        ]);
+        RfidCard::create([
+            'uid' => '11223344',
+            'user_id' => $users[2]->id,
+            'label' => 'Kartu Andi Pratama',
+        ]);
 
         // Schedules
         $shiftPagi = Schedule::create([
@@ -65,10 +79,11 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Sample attendances (today)
-        foreach ($users as $user) {
+        $uids = ['A1B2C3D4', 'E5F6A7B8', '11223344'];
+        foreach ($users as $index => $user) {
             Attendance::create([
                 'user_id' => $user->id,
-                'uid' => $user->rfid_uid,
+                'uid' => $uids[$index],
                 'status' => 'masuk',
                 'schedule_id' => $shiftPagi->id,
                 'device_id' => 'ESP32-WOKWI-SIM',
@@ -80,7 +95,7 @@ class DatabaseSeeder extends Seeder
         // Some users also checked out
         Attendance::create([
             'user_id' => $users[0]->id,
-            'uid' => $users[0]->rfid_uid,
+            'uid' => 'A1B2C3D4',
             'status' => 'pulang',
             'schedule_id' => $shiftPagi->id,
             'device_id' => 'ESP32-WOKWI-SIM',

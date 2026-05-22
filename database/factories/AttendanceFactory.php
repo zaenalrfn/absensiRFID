@@ -23,7 +23,7 @@ class AttendanceFactory extends Factory
 
         return [
             'user_id' => $user->id,
-            'uid' => $user->rfid_uid ?? strtoupper(fake()->bothify('########')),
+            'uid' => $user->rfidCard?->uid ?? strtoupper(fake()->bothify('########')),
             'status' => fake()->randomElement(['masuk', 'pulang']),
             'schedule_id' => Schedule::inRandomOrder()->first()?->id,
             'device_id' => fake()->randomElement(['ESP32-WOKWI-SIM', 'ESP32-KELAS-A', 'ESP32-LOBBY']),
