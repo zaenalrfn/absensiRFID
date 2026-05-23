@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
+            $table->dropUnique('users_rfid_uid_unique');
             $table->dropColumn('rfid_uid');
         });
     }

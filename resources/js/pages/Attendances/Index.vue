@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { dashboard } from '@/routes';
 import type { AttendanceRecord, Paginated, PaginationLink } from '@/types';
 
@@ -27,6 +27,16 @@ const filterDate = ref(props.filters.date ?? '');
 const filterUserId = ref(props.filters.user_id ?? '');
 const filterStatus = ref(props.filters.status ?? '');
 
+const attendancesList = ref({ ...props.attendances });
+
+watch(
+    () => props.attendances,
+    (newAttendances) => {
+        attendancesList.value = { ...newAttendances };
+    },
+    { deep: true }
+);
+
 function applyFilters() {
     const params: Record<string, string> = {};
     if (filterDate.value) {
@@ -38,15 +48,67 @@ function applyFilters() {
     if (filterStatus.value) {
         params.status = filterStatus.value;
     }
-    router.get('/attendances', params, { preserveState: true });
+    router.get('/attendances', params, { 
+        preserveState: true,
+        replace: true
+    });
 }
 
 function clearFilters() {
     filterDate.value = '';
     filterUserId.value = '';
     filterStatus.value = '';
-    router.get('/attendances', {}, { preserveState: true });
 }
+
+// Automatically filter when any input changes
+watch([filterDate, filterUserId, filterStatus], () => {
+    applyFilters();
+});
+
+// Keep local filter inputs in sync if filters props change from outside (e.g. navigation)
+watch(
+    () => props.filters,
+    (newFilters) => {
+        filterDate.value = newFilters.date ?? '';
+        filterUserId.value = newFilters.user_id ?? '';
+        filterStatus.value = newFilters.status ?? '';
+    },
+    { deep: true }
+);
+
+onMounted(() => {
+    if (window.Echo) {
+        window.Echo.channel('attendance-channel')
+            .listen('AttendanceCreated', (e: any) => {
+                // Only prepend new record if we are on the first page
+                if (attendancesList.value.current_page === 1) {
+                    attendancesList.value.data.unshift({
+                        id: e.id,
+                        user_name: e.user_name,
+                        uid: e.uid || '',
+                        status: e.status,
+                        schedule: e.schedule,
+                        device_id: e.device_id,
+                        timestamp: e.timestamp,
+                    });
+
+                    // Limit page to exactly 20 items
+                    if (attendancesList.value.data.length > 20) {
+                        attendancesList.value.data.pop();
+                    }
+
+                    // Increment the total count
+                    attendancesList.value.total++;
+                }
+            });
+    }
+});
+
+onUnmounted(() => {
+    if (window.Echo) {
+        window.Echo.leaveChannel('attendance-channel');
+    }
+});
 </script>
 
 <template>
@@ -129,7 +191,7 @@ function clearFilters() {
                     </thead>
                     <tbody>
                         <tr
-                            v-for="item in attendances.data"
+                            v-for="item in attendancesList.data"
                             :key="item.id"
                             class="border-b border-neutral-100 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50"
                         >
@@ -145,7 +207,7 @@ function clearFilters() {
                                     :class="
                                         item.status === 'masuk'
                                             ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                            : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                             : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                                     "
                                 >
                                     {{ item.status === 'masuk' ? 'Masuk' : 'Pulang' }}
@@ -159,7 +221,7 @@ function clearFilters() {
                             </td>
                             <td class="px-6 py-4 text-neutral-500 dark:text-neutral-400">{{ item.timestamp }}</td>
                         </tr>
-                        <tr v-if="attendances.data.length === 0">
+                        <tr v-if="attendancesList.data.length === 0">
                             <td colspan="6" class="px-6 py-12 text-center text-neutral-400">
                                 Tidak ada data presensi.
                             </td>
@@ -170,15 +232,15 @@ function clearFilters() {
 
             <!-- Pagination -->
             <div
-                v-if="attendances.last_page > 1"
+                v-if="attendancesList.last_page > 1"
                 class="flex items-center justify-between border-t border-neutral-200 px-6 py-3 dark:border-neutral-700"
             >
                 <p class="text-sm text-neutral-500 dark:text-neutral-400">
-                    {{ attendances.total }} records
+                    {{ attendancesList.total }} records
                 </p>
                 <div class="flex gap-1">
                     <a
-                        v-for="link in attendances.links"
+                        v-for="link in attendancesList.links"
                         :key="link.label"
                         :href="link.url ?? undefined"
                         class="rounded-lg px-3 py-1.5 text-sm transition-colors"

@@ -27,7 +27,7 @@ class AttendanceController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $paginator = $query->paginate(20)->withQueryString();
+        $paginator = $query->paginate(10)->withQueryString();
 
         $paginator->through(fn (Attendance $a) => [
             'id' => $a->id,

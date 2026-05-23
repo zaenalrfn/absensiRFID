@@ -211,3 +211,26 @@ test('it correctly maps night shift checkout even after hours when close to morn
         'schedule_id' => $shiftMalam->id,
     ]);
 });
+
+test('it automatically registers a new device when attendance is recorded', function () {
+    Carbon::setTestNow('2024-01-01 09:00:00');
+    $user = User::factory()->create();
+    RfidCard::create(['uid' => 'AUTO-DEVICE-UID', 'user_id' => $user->id]);
+
+    $this->assertDatabaseMissing('devices', [
+        'device_code' => 'NEW-AUTO-DEVICE',
+    ]);
+
+    $response = $this->postJson('/api/presensi', [
+        'uid' => 'AUTO-DEVICE-UID',
+        'device_id' => 'NEW-AUTO-DEVICE',
+    ]);
+
+    $response->assertStatus(200);
+
+    $this->assertDatabaseHas('devices', [
+        'device_code' => 'NEW-AUTO-DEVICE',
+        'device_name' => 'Device Baru',
+        'last_ip' => '127.0.0.1',
+    ]);
+});

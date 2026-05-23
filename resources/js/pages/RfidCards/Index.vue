@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { CreditCard, Trash2, UserPlus, History } from 'lucide-vue-next';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { dashboard } from '@/routes';
 
 interface RfidCard {
@@ -27,6 +28,49 @@ defineOptions({
             { title: 'Kartu RFID', href: '/rfid-cards' },
         ],
     },
+});
+
+const cardsList = ref([...props.cards]);
+
+watch(
+    () => props.cards,
+    (newCards) => {
+        cardsList.value = [...newCards];
+    },
+    { deep: true }
+);
+
+onMounted(() => {
+    if (window.Echo) {
+        window.Echo.channel('attendance-channel')
+            .listen('RfidCardScanned', (e: any) => {
+                const existingCardIndex = cardsList.value.findIndex(c => c.uid === e.uid);
+                
+                if (existingCardIndex !== -1) {
+                    // Update existing card's last_seen_at
+                    cardsList.value[existingCardIndex].last_seen_at = e.last_seen_at;
+                    // Move it to the top since the list is sorted by latest last_seen_at
+                    const [updatedCard] = cardsList.value.splice(existingCardIndex, 1);
+                    cardsList.value.unshift(updatedCard);
+                } else {
+                    // Prepend new card
+                    cardsList.value.unshift({
+                        id: e.id,
+                        uid: e.uid,
+                        user_id: e.user_id,
+                        label: e.label,
+                        last_seen_at: e.last_seen_at,
+                        user: e.user
+                    });
+                }
+            });
+    }
+});
+
+onUnmounted(() => {
+    if (window.Echo) {
+        window.Echo.leaveChannel('attendance-channel');
+    }
 });
 
 const assignForm = useForm({
@@ -100,7 +144,7 @@ function formatTime(dateStr: string | null) {
                     </div>
                     <div>
                         <p class="text-sm text-neutral-500">Total Kartu</p>
-                        <p class="text-2xl font-bold">{{ cards.length }}</p>
+                        <p class="text-2xl font-bold">{{ cardsList.length }}</p>
                     </div>
                 </div>
             </div>
@@ -111,7 +155,7 @@ function formatTime(dateStr: string | null) {
                     </div>
                     <div>
                         <p class="text-sm text-neutral-500">Belum Ditugaskan</p>
-                        <p class="text-2xl font-bold">{{ cards.filter(c => !c.user_id).length }}</p>
+                        <p class="text-2xl font-bold">{{ cardsList.filter(c => !c.user_id).length }}</p>
                     </div>
                 </div>
             </div>
@@ -123,7 +167,7 @@ function formatTime(dateStr: string | null) {
                     <div>
                         <p class="text-sm text-neutral-500">Aktif Hari Ini</p>
                         <p class="text-2xl font-bold">
-                            {{ cards.filter(c => c.last_seen_at && new Date(c.last_seen_at).toDateString() === new Date().toDateString()).length }}
+                            {{ cardsList.filter(c => c.last_seen_at && new Date(c.last_seen_at).toDateString() === new Date().toDateString()).length }}
                         </p>
                     </div>
                 </div>
@@ -143,7 +187,7 @@ function formatTime(dateStr: string | null) {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="card in cards" :key="card.id" class="border-b border-neutral-100 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50">
+                        <tr v-for="card in cardsList" :key="card.id" class="border-b border-neutral-100 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50">
                             <td class="px-6 py-4">
                                 <code class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs font-bold dark:bg-neutral-800">
                                     {{ card.uid }}
@@ -185,7 +229,7 @@ function formatTime(dateStr: string | null) {
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="cards.length === 0">
+                        <tr v-if="cardsList.length === 0">
                             <td colspan="5" class="px-6 py-12 text-center text-neutral-500">
                                 Belum ada kartu yang terdeteksi. Silakan tap kartu pada alat.
                             </td>

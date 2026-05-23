@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Events\AttendanceCreated;
+use App\Events\RfidCardScanned;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Device;
@@ -32,6 +33,8 @@ class AttendanceController extends Controller
         );
 
         $card->update(['last_seen_at' => $now]);
+
+        broadcast(new RfidCardScanned($card))->toOthers();
 
         // 2. Check Assignment
         if (! $card->user_id) {
@@ -84,10 +87,16 @@ class AttendanceController extends Controller
 
             // If no active schedule, try to find the "closest" one based on closest start_time or end_time
             if (! $schedule) {
-                $schedule = Schedule::orderByRaw(
-                    'LEAST(ABS(TIME_TO_SEC(TIMEDIFF(start_time, ?))), ABS(TIME_TO_SEC(TIMEDIFF(end_time, ?))))',
-                    [$currentTime, $currentTime]
-                )->first();
+                $schedule = Schedule::all()->sortBy(function (Schedule $s) use ($currentTime) {
+                    $startSec = strtotime($s->start_time->format('H:i:s'));
+                    $endSec = strtotime($s->end_time->format('H:i:s'));
+                    $currentSec = strtotime($currentTime);
+
+                    $diffStart = abs($startSec - $currentSec);
+                    $diffEnd = abs($endSec - $currentSec);
+
+                    return min($diffStart, $diffEnd);
+                })->first();
             }
 
             if (! $schedule) {
@@ -128,12 +137,19 @@ class AttendanceController extends Controller
             'created_at' => $now,
         ]);
 
-        // 6. Update Device Status
-        Device::where('device_code', $validated['device_id'])
-            ->update([
-                'last_seen_at' => $now,
-                'last_ip' => $request->ip(),
-            ]);
+        // 6. Update Device Status (Create if not exists)
+        $device = Device::firstOrCreate(
+            ['device_code' => $validated['device_id']],
+            [
+                'device_name' => 'Device Baru',
+                'created_at' => $now,
+            ]
+        );
+
+        $device->update([
+            'last_seen_at' => $now,
+            'last_ip' => $request->ip(),
+        ]);
 
         // 7. Broadcast Event
         broadcast(new AttendanceCreated($attendance))->toOthers();
